@@ -20,6 +20,8 @@ public:
 	UPROPERTY()
 	TArray<FPathNode> Grid;
 
+	FPathNode NodeFromWorldPoint(const FVector& worldPosition);
+
 	virtual void Tick(float DeltaTime) override;
 
 protected:
