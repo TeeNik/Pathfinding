@@ -1,11 +1,23 @@
 #include "Core/AStarPathfinder.h"
 #include "Core/PathNode.h"
 #include "Core/PathGrid.h"
+#include "Containers/BinaryHeap.h"
+
+AAStarPathfinder::AAStarPathfinder()
+{
+	PrimaryActorTick.bCanEverTick = true;
+}
 
 void AAStarPathfinder::SetSeekerAndTarget(AActor* seeker, AActor* target)
 {
 	Seeker = seeker;
 	Target = target;
+}
+
+void AAStarPathfinder::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	FindPath(Seeker->GetActorLocation(), Target->GetActorLocation());
 }
 
 void AAStarPathfinder::SetPathGrid(APathGrid* grid)
@@ -15,29 +27,32 @@ void AAStarPathfinder::SetPathGrid(APathGrid* grid)
 
 void AAStarPathfinder::FindPath(FVector startPos, FVector endPos)
 {
+	int64 startTime = GetUnixTime();
+
 	UPathNode* startNode = Grid->NodeFromWorldPoint(startPos);
 	UPathNode* endNode = Grid->NodeFromWorldPoint(endPos);
 
-	TArray<UPathNode*> openSet;
+	UPathNode::FNodeSorter sorter;
+
+	TSet<UPathNode*> openSet;
+	TArray<UPathNode*> openHeap;
+	openSet.Add(startNode);
+	openHeap.HeapPush(startNode, sorter);
+
 	TSet<UPathNode*> closeSet;
-	openSet.Emplace(startNode);
 
-	while (openSet.Num() > 0)
+	while (openHeap.Num() > 0)
 	{
-		UPathNode* currentNode = openSet[0];
-		for(int i = 1; i < openSet.Num(); ++i)
-		{
-			if(openSet[i]->GetF() < currentNode->GetF() || (openSet[i]->GetF() == currentNode->GetF() && openSet[i]->H < currentNode->H))
-			{
-				currentNode = openSet[i];
-			}
-		}
-
+		UPathNode* currentNode;
+		openHeap.HeapPop(currentNode, sorter);
 		openSet.Remove(currentNode);
+
 		closeSet.Add(currentNode);
 
 		if(currentNode == endNode)
 		{
+			Grid->Path = RetracePath(startNode, endNode);
+			UE_LOG(LogTemp, Log, TEXT("Time spend: %d"), GetUnixTime() - startTime);
 			return;
 		}
 
@@ -56,6 +71,7 @@ void AAStarPathfinder::FindPath(FVector startPos, FVector endPos)
 
 				if(!openSet.Contains(neighbour))
 				{
+					openHeap.HeapPush(neighbour, sorter);
 					openSet.Add(neighbour);
 				}
 			}
@@ -68,7 +84,7 @@ int AAStarPathfinder::GetDistance(UPathNode* a, UPathNode* b)
 	int distX = FMath::Abs(a->X - b->X);
 	int distY = FMath::Abs(a->Y - b->Y);
 
-	if(distX < distY)
+	if(distX > distY)
 	{
 		return 14 * distY + 10 * (distX - distY);
 	}
@@ -82,10 +98,16 @@ TArray<UPathNode*> AAStarPathfinder::RetracePath(UPathNode* startNode, UPathNode
 {
 	TArray<UPathNode*> path;
 	UPathNode* currentNode = endNode;
-	while (currentNode == startNode)
+	while (currentNode != startNode)
 	{
 		path.Add(currentNode);
 		currentNode = currentNode->Parent;
 	}
 	return path;
+}
+
+int64 AAStarPathfinder::GetUnixTime()
+{
+	FDateTime timeUtc = FDateTime::UtcNow();
+	return timeUtc.ToUnixTimestamp() * 1000 + timeUtc.GetMillisecond();
 }
