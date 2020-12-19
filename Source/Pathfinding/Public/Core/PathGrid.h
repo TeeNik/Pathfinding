@@ -18,9 +18,10 @@ public:
 	UPROPERTY(EditAnywhere)
 	float NodeRadius;
 	UPROPERTY()
-	TArray<FPathNode> Grid;
+	TArray<UPathNode*> Grid;
 
-	FPathNode NodeFromWorldPoint(const FVector& worldPosition);
+	UPathNode* NodeFromWorldPoint(const FVector& worldPosition);
+	TArray<UPathNode*> GetNeighbours(UPathNode* node);
 
 	virtual void Tick(float DeltaTime) override;
 

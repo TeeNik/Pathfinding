@@ -1,8 +1,10 @@
 #pragma once
+#include "CoreMinimal.h"
+#include "UObject/NoExportTypes.h"
 #include "PathNode.generated.h"
 
-USTRUCT()
-struct PATHFINDING_API FPathNode
+UCLASS()
+class PATHFINDING_API UPathNode : public UObject
 {
 	GENERATED_BODY()
 
@@ -10,6 +12,15 @@ public:
 	bool IsWalkable;
 	FVector WorldPosition;
 
-	FPathNode();
-	FPathNode(bool isWalkable, FVector worldPos);
+	int X;
+	int Y;
+	int G;
+	int H;
+
+	UPathNode* Parent = nullptr;
+
+	UPathNode();
+	void Init(bool isWalkable, FVector worldPos, int x, int y);
+
+	FORCEINLINE int GetF() const { return G + H; }
 };

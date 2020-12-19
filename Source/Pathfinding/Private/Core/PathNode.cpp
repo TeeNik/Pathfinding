@@ -1,11 +1,13 @@
 #include "Core/PathNode.h"
 
-FPathNode::FPathNode()
+UPathNode::UPathNode()
 {
 }
 
-FPathNode::FPathNode(bool isWalkable, FVector worldPos)
+void UPathNode::Init(bool isWalkable, FVector worldPos, int x, int y)
 {
 	IsWalkable = isWalkable;
 	WorldPosition = worldPos;
+	X = x;
+	Y = y;
 }

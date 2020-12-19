@@ -19,7 +19,7 @@ void APathGrid::BeginPlay()
 	DrawGrid();
 }
 
-FPathNode APathGrid::NodeFromWorldPoint(const FVector& worldPosition)
+UPathNode* APathGrid::NodeFromWorldPoint(const FVector& worldPosition)
 {
 	float percentX = (worldPosition.X + GridWorldSize.X / 2) / GridWorldSize.X;
 	float percentY = (worldPosition.Y + GridWorldSize.Y / 2) / GridWorldSize.Y;
@@ -30,15 +30,35 @@ FPathNode APathGrid::NodeFromWorldPoint(const FVector& worldPosition)
 	return Grid[x * GridSizeX + y];
 }
 
+TArray<UPathNode*> APathGrid::GetNeighbours(UPathNode* node)
+{
+	TArray<UPathNode*> neighbours;
+	for (int i = -1; i <= 1; ++i)
+	{
+		for (int j = -1; j <= 1; ++j)
+		{
+			if(i == 0 && j == 0)
+				continue;
+
+			int x = node->X + i;
+			int y = node->Y + j;
+			if(x >= 0 && x < GridSizeX && y >= 0 && y < GridSizeY)
+			{
+				neighbours.Emplace(Grid[x * GridSizeX + y]);
+			}
+		}
+	}
+	return neighbours;
+}
+
 void APathGrid::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 }
 
 void APathGrid::CreateGrid()
 {
-	Grid.Init(FPathNode(), GridSizeX * GridSizeY);
+	Grid.Init(nullptr, GridSizeX * GridSizeY);
 
 	FVector worldBottomLeft = GetActorLocation() - FVector::RightVector * GridWorldSize.X / 2 - FVector::ForwardVector * GridWorldSize.Y / 2;
 	for (int i = 0; i < GridSizeX; ++i)
@@ -48,15 +68,14 @@ void APathGrid::CreateGrid()
 			FVector worldPoint = worldBottomLeft + FVector::RightVector * (i * NodeDiameter + NodeRadius) + FVector::ForwardVector * (j * NodeDiameter + NodeRadius);
 
 			TArray<FHitResult> HitResults;
-			FVector startLocation = worldPoint;
-			FVector endLocation = startLocation + FVector(0, 0, NodeRadius);
-
-			ECollisionChannel ECC = ECollisionChannel::ECC_WorldStatic;
 			FCollisionShape CollisionShape;
 			CollisionShape.ShapeType = ECollisionShape::Sphere;
 			CollisionShape.SetSphere(NodeRadius);
-			bool isWalkable = !GetWorld()->SweepMultiByChannel(HitResults, worldPoint, worldPoint, FQuat::FQuat(), ECC, CollisionShape);
-			Grid[i * GridSizeX + j] = FPathNode(isWalkable, worldPoint);
+			bool isWalkable = !GetWorld()->SweepMultiByChannel(HitResults, worldPoint, worldPoint, FQuat(), ECC_WorldStatic, CollisionShape);
+			int index = i * GridSizeX + j;
+			Grid[index] = NewObject<UPathNode>();
+			Grid[index]->IsWalkable = isWalkable;
+			Grid[index]->WorldPosition = worldPoint;
 		}
 	}
 }
@@ -64,11 +83,11 @@ void APathGrid::CreateGrid()
 void APathGrid::DrawGrid()
 {
 	DrawDebugBox(GetWorld(), GetActorLocation(), FVector(GridWorldSize/2, 10), FColor::Green, false, 100);
-	for (const FPathNode& node : Grid)
+	for (const UPathNode* node : Grid)
 	{
-		FColor color = node.IsWalkable ? FColor::White : FColor::Red;
-		int priority = node.IsWalkable ? 0 : -1;
+		FColor color = node->IsWalkable ? FColor::White : FColor::Red;
+		int priority = node->IsWalkable ? 0 : -1;
 		FVector bounds = FVector(NodeRadius, NodeRadius, 10);
-		DrawDebugBox(GetWorld(), node.WorldPosition, bounds, color, false, 100, priority);
+		DrawDebugBox(GetWorld(), node->WorldPosition, bounds, color, false, 100, priority);
 	}
 }
