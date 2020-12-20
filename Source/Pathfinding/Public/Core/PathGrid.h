@@ -17,8 +17,10 @@ public:
 	FVector2D GridWorldSize;
 	UPROPERTY(EditAnywhere)
 	float NodeRadius;
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TArray<UPathNode*> Grid;
+
+	TArray<UPathNode*> Path;
 
 	UPathNode* NodeFromWorldPoint(const FVector& worldPosition);
 	TArray<UPathNode*> GetNeighbours(UPathNode* node);
