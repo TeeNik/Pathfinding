@@ -22,6 +22,7 @@ public:
 private:
 	int GetDistance(UPathNode* a, UPathNode* b);
 	TArray<UPathNode*> RetracePath(UPathNode* startNode, UPathNode* endNode);
+	TArray<FVector> NormalizePath(const TArray<UPathNode*> path);
 
 	UPROPERTY(EditAnywhere)
 	TSoftObjectPtr<AActor> Seeker;

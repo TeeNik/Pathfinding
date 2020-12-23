@@ -2,6 +2,7 @@
 #include "Core/PathNode.h"
 #include "Core/PathGrid.h"
 #include "Containers/BinaryHeap.h"
+#include "Algo/Reverse.h"
 
 AAStarPathfinder::AAStarPathfinder()
 {
@@ -52,6 +53,7 @@ void AAStarPathfinder::FindPath(FVector startPos, FVector endPos)
 		if(currentNode == endNode)
 		{
 			Grid->Path = RetracePath(startNode, endNode);
+			Grid->NormalizedPath = NormalizePath(Grid->Path);
 			UE_LOG(LogTemp, Log, TEXT("Time spend: %d"), GetUnixTime() - startTime);
 			return;
 		}
@@ -103,7 +105,25 @@ TArray<UPathNode*> AAStarPathfinder::RetracePath(UPathNode* startNode, UPathNode
 		path.Add(currentNode);
 		currentNode = currentNode->Parent;
 	}
+	Algo::Reverse(path);
 	return path;
+}
+
+TArray<FVector> AAStarPathfinder::NormalizePath(const TArray<UPathNode*> path)
+{
+	TArray<FVector> normalizedPath;
+	FVector2D direction = FVector2D::ZeroVector;
+
+	for(int i = 1; i < path.Num(); ++i)
+	{
+		FVector2D newDirection = FVector2D(path[i - 1]->X - path[i]->X, path[i - 1]->Y - path[i]->Y);
+		if(direction != newDirection)
+		{
+			normalizedPath.Add(path[i-1]->WorldPosition);
+		}
+		direction = newDirection;
+	}
+	return normalizedPath;
 }
 
 int64 AAStarPathfinder::GetUnixTime()
