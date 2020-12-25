@@ -9,6 +9,12 @@ AAStarPathfinder::AAStarPathfinder()
 	PrimaryActorTick.bCanEverTick = true;
 }
 
+void AAStarPathfinder::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	//FindPath(Seeker->GetActorLocation(), Target->GetActorLocation());
+}
+
 TArray<FVector> AAStarPathfinder::FindPath(FVector startPos, FVector endPos)
 {
 	int64 startTime = GetUnixTime();

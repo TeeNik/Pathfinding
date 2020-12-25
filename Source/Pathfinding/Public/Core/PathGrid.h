@@ -21,6 +21,7 @@ public:
 	TArray<UPathNode*> Grid;
 
 	TArray<UPathNode*> Path;
+	TArray<FVector> NormalizedPath;
 
 	UPathNode* NodeFromWorldPoint(const FVector& worldPosition);
 	TArray<UPathNode*> GetNeighbours(UPathNode* node);

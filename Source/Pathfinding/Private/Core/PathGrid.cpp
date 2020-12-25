@@ -58,8 +58,14 @@ void APathGrid::Tick(float DeltaTime)
 	FVector bounds = FVector(NodeRadius, NodeRadius, 10);
 	for (UPathNode* node : Path)
 	{
-		DrawDebugBox(GetWorld(), node->WorldPosition, bounds, FColor::Blue, false, -1, -2);
+		DrawDebugBox(GetWorld(), node->WorldPosition, bounds, FColor::Green, false, -1, -2);
 	}
+
+	for (int i = 0; i < NormalizedPath.Num(); ++i)
+	{
+		DrawDebugBox(GetWorld(), NormalizedPath[i], bounds, FColor::Blue, false, -1, -3);
+	}
+
 }
 
 void APathGrid::CreateGrid()
@@ -96,5 +102,4 @@ void APathGrid::DrawGrid()
 		int priority = node->IsWalkable ? 0 : -1;
 		DrawDebugBox(GetWorld(), node->WorldPosition, bounds, color, false, 100, priority);
 	}
-
 }

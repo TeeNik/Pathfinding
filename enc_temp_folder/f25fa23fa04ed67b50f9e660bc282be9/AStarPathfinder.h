@@ -15,12 +15,17 @@ class PATHFINDING_API AAStarPathfinder : public AActor
 public:
 	AAStarPathfinder();
 	TArray<FVector> FindPath(FVector startPos, FVector endPos);
+	virtual void Tick(float DeltaTime) override;
 
 private:
 	int GetDistance(UPathNode* a, UPathNode* b);
 	TArray<UPathNode*> RetracePath(UPathNode* startNode, UPathNode* endNode);
 	TArray<FVector> NormalizePath(const TArray<UPathNode*> path);
 
+	//UPROPERTY(EditAnywhere)
+	//TSoftObjectPtr<AActor> Seeker;
+	//UPROPERTY(EditAnywhere)
+	//TSoftObjectPtr<AActor> Target;
 	UPROPERTY(EditAnywhere)
 	TSoftObjectPtr<APathGrid> Grid;
 
