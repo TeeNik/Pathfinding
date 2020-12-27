@@ -25,11 +25,13 @@ public:
 	int Y;
 	int G;
 	int H;
+	int Weight;
 
+	UPROPERTY(Transient)
 	UPathNode* Parent = nullptr;
 
 	UPathNode();
-	void Init(bool isWalkable, FVector worldPos, int x, int y);
+	void Init(bool isWalkable, FVector worldPos, int x, int y, int weight);
 
 	FORCEINLINE int GetF() const { return G + H; }
 

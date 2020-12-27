@@ -1,10 +1,10 @@
 #include "Core/PathGrid.h"
 #include "DrawDebugHelpers.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
 
 APathGrid::APathGrid()
 {
-	PrimaryActorTick.bCanEverTick = true;
-
+	//PrimaryActorTick.bCanEverTick = true;
 }
 
 void APathGrid::BeginPlay()
@@ -14,6 +14,11 @@ void APathGrid::BeginPlay()
 	NodeDiameter = NodeRadius * 2;
 	GridSizeX = FMath::RoundToInt(GridWorldSize.X / NodeDiameter);
 	GridSizeY = FMath::RoundToInt(GridWorldSize.Y / NodeDiameter);
+
+	for(const FSurfaceInfo& info : SurfaceInfo)
+	{
+		SurfaceWeights.Emplace(info.Type, info.Weight);
+	}
 
 	CreateGrid();
 	DrawGrid();
@@ -27,7 +32,7 @@ UPathNode* APathGrid::NodeFromWorldPoint(const FVector& worldPosition)
 	percentY = FMath::Clamp(percentY, 0.0f, 1.0f);
 	int x = FMath::RoundToInt((GridSizeX - 1) * percentX);
 	int y = FMath::RoundToInt((GridSizeY - 1) * percentY);
-	return Grid[y * GridSizeX + x];
+	return Grid.Get(y * GridSizeY + x);// [y * GridSizeY + x] ;
 }
 
 TArray<UPathNode*> APathGrid::GetNeighbours(UPathNode* node)
@@ -44,33 +49,16 @@ TArray<UPathNode*> APathGrid::GetNeighbours(UPathNode* node)
 			int y = node->Y + j;
 			if(x >= 0 && x < GridSizeX && y >= 0 && y < GridSizeY)
 			{
-				neighbours.Emplace(Grid[x * GridSizeX + y]);
+				neighbours.Emplace(Grid.Get(x, y));
 			}
 		}
 	}
 	return neighbours;
 }
 
-void APathGrid::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	FVector bounds = FVector(NodeRadius, NodeRadius, 10);
-	for (UPathNode* node : Path)
-	{
-		DrawDebugBox(GetWorld(), node->WorldPosition, bounds, FColor::Green, false, -1, -2);
-	}
-
-	for (int i = 0; i < NormalizedPath.Num(); ++i)
-	{
-		DrawDebugBox(GetWorld(), NormalizedPath[i], bounds, FColor::Blue, false, -1, -3);
-	}
-
-}
-
 void APathGrid::CreateGrid()
 {
-	Grid.Init(nullptr, GridSizeX * GridSizeY);
+	Grid.Init(nullptr, GridSizeX, GridSizeY);
 
 	FVector worldBottomLeft = GetActorLocation() - FVector::RightVector * GridWorldSize.X / 2 - FVector::ForwardVector * GridWorldSize.Y / 2;
 	for (int i = 0; i < GridSizeX; ++i)
@@ -84,21 +72,65 @@ void APathGrid::CreateGrid()
 			CollisionShape.ShapeType = ECollisionShape::Sphere;
 			CollisionShape.SetSphere(NodeRadius);
 			bool isWalkable = !GetWorld()->SweepMultiByChannel(HitResults, worldPoint, worldPoint, FQuat(), ECC_WorldStatic, CollisionShape);
-			int index = i * GridSizeX + j;
-			Grid[index] = NewObject<UPathNode>();
-			Grid[index]->Init(isWalkable, worldPoint, i, j);
+			int weight = 0;
+
+			if(isWalkable)
+			{
+				FHitResult surfaceHit;
+				FCollisionQueryParams params;
+				params.bReturnPhysicalMaterial = true;
+				GetWorld()->LineTraceSingleByChannel(surfaceHit, worldPoint, worldPoint - FVector::UpVector * 100, ECC_WorldStatic, params);
+				//DrawDebugLine(GetWorld(), worldPoint, worldPoint - FVector::UpVector * 100, FColor::White, false, 100);
+				if (surfaceHit.IsValidBlockingHit())
+				{
+					UPhysicalMaterial* physMaterial = surfaceHit.PhysMaterial.Get();
+					EPhysicalSurface surfaceType = UPhysicalMaterial::DetermineSurfaceType(physMaterial);
+					weight = SurfaceWeights.Contains(surfaceType) ? SurfaceWeights[surfaceType] : 0;
+				}
+			}
+
+			//int index = i * GridSizeX + j;
+			UPathNode* node = NewObject<UPathNode>();
+			node->Init(isWalkable, worldPoint, i, j, weight);
+			Grid.Set(node, i, j);
+			
+			//Grid[index] = NewObject<UPathNode>();
+			//Grid[index]->Init(isWalkable, worldPoint, i, j, weight);
 		}
 	}
+}
+
+void APathGrid::BlurWeights(int blurSize)
+{
+	int kernelSize = blurSize * 2 + 1;
+	int kernelExtends = kernelSize / 2 - 1;
+
+	TArray2D<int> weightsHorizontal;
+	weightsHorizontal.Init(0, GridSizeX, GridSizeY);
+	TArray2D<int> weightsVertical;
+	weightsVertical.Init(0, GridSizeX, GridSizeY);
+
 }
 
 void APathGrid::DrawGrid()
 {
 
 	DrawDebugBox(GetWorld(), GetActorLocation(), FVector(GridWorldSize/2, 10), FColor::Green, false, 100);
-	FVector bounds = FVector(NodeRadius, NodeRadius, 10);
-	for (const UPathNode* node : Grid)
+	FVector bounds = FVector(NodeRadius, NodeRadius, 0);
+	
+	for(int i = 0; i < Grid.Num(); ++i)
 	{
-		FColor color = node->IsWalkable ? FColor::White : FColor::Red;
+		UPathNode* node = Grid.Get(i);
+		FColor color;
+		if (node->IsWalkable)
+		{
+			color = node->Weight > 0 ? FColor::White : FColor::Yellow;
+		}
+		else
+		{
+			color = FColor::Red;
+		}
+
 		int priority = node->IsWalkable ? 0 : -1;
 		DrawDebugBox(GetWorld(), node->WorldPosition, bounds, color, false, 100, priority);
 	}
