@@ -47,7 +47,7 @@ TArray<FVector> AAStarPathfinder::FindPath(FVector startPos, FVector endPos)
 			{
 				continue;
 			}
-			int moveCostToNeighbour = currentNode->G + GetDistance(currentNode, neighbour);
+			int moveCostToNeighbour = currentNode->G + GetDistance(currentNode, neighbour) + neighbour->Weight;
 			if(moveCostToNeighbour < neighbour->G || !openSet.Contains(neighbour))
 			{
 				neighbour->G = moveCostToNeighbour;
