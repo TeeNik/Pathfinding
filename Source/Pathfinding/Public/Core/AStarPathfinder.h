@@ -23,6 +23,8 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSoftObjectPtr<APathGrid> Grid;
+	UPROPERTY(EditAnywhere)
+	float MinWaypointDist;
 
 	int64 GetUnixTime();
 };

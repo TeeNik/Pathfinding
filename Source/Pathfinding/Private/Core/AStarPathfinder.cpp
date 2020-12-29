@@ -3,6 +3,7 @@
 #include "Core/PathGrid.h"
 #include "Containers/BinaryHeap.h"
 #include "Algo/Reverse.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 AAStarPathfinder::AAStarPathfinder()
 {
@@ -37,6 +38,10 @@ TArray<FVector> AAStarPathfinder::FindPath(FVector startPos, FVector endPos)
 		{
 			TArray<UPathNode*> path = RetracePath(startNode, endNode);
 			TArray<FVector> normalizePath = NormalizePath(path);
+			for (FVector point : normalizePath)
+			{
+				UKismetSystemLibrary::DrawDebugPlane(GetWorld(), FPlane(0, 0, 1, 50), point, Grid->NodeRadius, FColor::Blue, 100);
+			}
 			UE_LOG(LogTemp, Log, TEXT("Time spend: %d"), GetUnixTime() - startTime);
 			return normalizePath;
 		}
@@ -103,7 +108,25 @@ TArray<FVector> AAStarPathfinder::NormalizePath(const TArray<UPathNode*> path)
 		FVector2D newDirection = FVector2D(path[i - 1]->X - path[i]->X, path[i - 1]->Y - path[i]->Y);
 		if(direction != newDirection)
 		{
-			normalizedPath.Add(path[i-1]->WorldPosition);
+			int num = normalizedPath.Num();
+			if(num > 0)
+			{
+				FVector prevPoint = normalizedPath[num - 1];
+				float dist = FVector::DistSquared(prevPoint, path[i - 1]->WorldPosition);
+				if(dist < MinWaypointDist* MinWaypointDist)
+				{
+					FVector middlePoint = (path[i - 1]->WorldPosition - prevPoint) / 2 + prevPoint;
+					normalizedPath[num - 1] = middlePoint;
+				}
+				else
+				{
+					normalizedPath.Add(path[i - 1]->WorldPosition);
+				}
+			}
+			else
+			{
+				normalizedPath.Add(path[i - 1]->WorldPosition);
+			}
 		}
 		direction = newDirection;
 	}
