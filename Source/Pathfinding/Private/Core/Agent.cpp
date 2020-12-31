@@ -2,6 +2,7 @@
 #include "Core/AStarPathfinder.h"
 #include "Pathfinding/PathfindingGameModeBase.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 AAgent::AAgent()
 {
@@ -16,14 +17,26 @@ void AAgent::BeginPlay()
 	APathfindingGameModeBase* GM = Cast<APathfindingGameModeBase>(GetWorld()->GetAuthGameMode());
 	if(GM)
 	{
-		Path = GM->Pathfinder->FindPath(GetActorLocation(), GM->Target->GetActorLocation());
-		if(Path.Num() > 0)
+		TArray<FVector> waypoints = GM->Pathfinder->FindPath(GetActorLocation(), GM->Target->GetActorLocation());
+		Path = FPath(waypoints, GetActorLocation(), TurnDistance);
+		if(waypoints.Num() > 0)
 		{
-			CurrentWaypoint = Path[0];
+			PathIndex = 1;
+			FRotator targetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Path.LookPoints[PathIndex]);
+			targetRotation.Roll = targetRotation.Pitch = 0;
+			SetActorRotation(targetRotation);
 			IsMoving = true;
+
+			for (FPathLine line : Path.TurnBoundaries)
+			{
+				float length = 10;
+				FVector lineDir(1, line.Gradient, 0);
+				lineDir.Normalize();
+				FVector lineCenter(line.PointOnLine1, 0);
+				UKismetSystemLibrary::DrawDebugLine(GetWorld(), lineCenter - lineDir * length / 2, lineCenter + lineDir * length / 2, FColor::Green, 100);
+			}
 		}
 	}
-	
 }
 
 void AAgent::Tick(float DeltaTime)
@@ -33,17 +46,24 @@ void AAgent::Tick(float DeltaTime)
 	if(IsMoving)
 	{
 		FVector actorLocation = GetActorLocation();
-		if(FVector::DistSquared(actorLocation, CurrentWaypoint) < 10)
+		FVector2D actorLoc2D = FVector2D(actorLocation);
+
+		if (Path.TurnBoundaries[PathIndex].HasCrossedLine(actorLoc2D))
 		{
-			++PathIndex;
-			if (PathIndex >= Path.Num())
+			if(PathIndex == Path.FinishLineIndex)
 			{
 				IsMoving = false;
 				return;
 			}
-			CurrentWaypoint = Path[PathIndex];
+			++PathIndex;
 		}
-		FVector position = UKismetMathLibrary::VInterpTo_Constant(actorLocation, CurrentWaypoint, DeltaTime, Speed);
+
+		FRotator targetRotation = UKismetMathLibrary::FindLookAtRotation(actorLocation, Path.LookPoints[PathIndex]);
+		targetRotation.Roll = targetRotation.Pitch = 0;
+		SetActorRotation(FMath::Lerp(GetActorRotation(), targetRotation, DeltaTime * TurnSpeed));
+
+		//FVector position = UKismetMathLibrary::VInterpTo_Constant(actorLocation, CurrentWaypoint, DeltaTime, Speed);
+		FVector position = actorLocation + GetActorForwardVector() * DeltaTime * Speed;
 		SetActorLocation(position);
 	}
 }

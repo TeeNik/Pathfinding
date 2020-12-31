@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Path.h"
 #include "Agent.generated.h"
 
 UCLASS()
@@ -18,8 +19,14 @@ protected:
 
 	UPROPERTY(EditAnywhere)
 	float Speed = 1.0f;
+	UPROPERTY(EditAnywhere)
+	float TurnSpeed = 3.0f;
+	UPROPERTY(EditAnywhere)
+	float TurnDistance = 20.0f;
 
-	TArray<FVector> Path;
+	FPath Path;
+
+	//TArray<FVector> Path;
 	bool IsMoving;
 	int PathIndex;
 	FVector CurrentWaypoint;

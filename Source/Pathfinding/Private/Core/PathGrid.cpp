@@ -1,10 +1,11 @@
 #include "Core/PathGrid.h"
 #include "DrawDebugHelpers.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/KismetMathLibrary.h"
 
 APathGrid::APathGrid()
 {
-	//PrimaryActorTick.bCanEverTick = true;
 }
 
 void APathGrid::BeginPlay()
@@ -32,7 +33,7 @@ UPathNode* APathGrid::NodeFromWorldPoint(const FVector& worldPosition)
 	percentY = FMath::Clamp(percentY, 0.0f, 1.0f);
 	int x = FMath::RoundToInt((GridSizeX - 1) * percentX);
 	int y = FMath::RoundToInt((GridSizeY - 1) * percentY);
-	return Grid.Get(y * GridSizeY + x);// [y * GridSizeY + x] ;
+	return Grid.Get(y * GridSizeY + x);
 }
 
 TArray<UPathNode*> APathGrid::GetNeighbours(UPathNode* node)
@@ -49,7 +50,7 @@ TArray<UPathNode*> APathGrid::GetNeighbours(UPathNode* node)
 			int y = node->Y + j;
 			if(x >= 0 && x < GridSizeX && y >= 0 && y < GridSizeY)
 			{
-				neighbours.Emplace(Grid.Get(x, y));
+				neighbours.Add(Grid.Get(x, y));
 			}
 		}
 	}
@@ -80,58 +81,100 @@ void APathGrid::CreateGrid()
 				FCollisionQueryParams params;
 				params.bReturnPhysicalMaterial = true;
 				GetWorld()->LineTraceSingleByChannel(surfaceHit, worldPoint, worldPoint - FVector::UpVector * 100, ECC_WorldStatic, params);
-				//DrawDebugLine(GetWorld(), worldPoint, worldPoint - FVector::UpVector * 100, FColor::White, false, 100);
 				if (surfaceHit.IsValidBlockingHit())
 				{
 					UPhysicalMaterial* physMaterial = surfaceHit.PhysMaterial.Get();
 					EPhysicalSurface surfaceType = UPhysicalMaterial::DetermineSurfaceType(physMaterial);
 					weight = SurfaceWeights.Contains(surfaceType) ? SurfaceWeights[surfaceType] : 0;
 				}
+			} 
+			else
+			{
+				//refactor it later
+				weight = SurfaceWeights[EPhysicalSurface::SurfaceType1];
 			}
 
-			//int index = i * GridSizeX + j;
 			UPathNode* node = NewObject<UPathNode>();
 			node->Init(isWalkable, worldPoint, i, j, weight);
-			Grid.Set(node, i, j);
-			
-			//Grid[index] = NewObject<UPathNode>();
-			//Grid[index]->Init(isWalkable, worldPoint, i, j, weight);
+			Grid.Get(i, j) = node;
 		}
 	}
+
+	BlurWeights(BlurSize);
 }
 
 void APathGrid::BlurWeights(int blurSize)
 {
 	int kernelSize = blurSize * 2 + 1;
-	int kernelExtends = kernelSize / 2 - 1;
+	int kernelExtends = (kernelSize - 1) / 2;
 
 	TArray2D<int> weightsHorizontal;
 	weightsHorizontal.Init(0, GridSizeX, GridSizeY);
 	TArray2D<int> weightsVertical;
 	weightsVertical.Init(0, GridSizeX, GridSizeY);
 
+	for(int y = 0; y < GridSizeY; ++y)
+	{
+		for(int x = - kernelExtends; x <= kernelExtends; ++x)
+		{
+			int sampleX = FMath::Clamp(x, 0, kernelExtends);
+			weightsHorizontal.Get(0, y) += Grid.Get(sampleX, y)->Weight;
+		}
+
+		for(int x = 1; x < GridSizeX; ++x)
+		{
+			int removeIndex = FMath::Clamp(x - kernelExtends - 1, 0, GridSizeX);
+			int addIndex = FMath::Clamp(x + kernelExtends, 0, GridSizeX - 1);
+			weightsHorizontal.Get(x, y) = weightsHorizontal.Get(x - 1, y) - Grid.Get(removeIndex, y)->Weight + Grid.Get(addIndex, y)->Weight;
+		}
+	}
+
+	for (int x = 0; x < GridSizeX; ++x)
+	{
+		for (int y = -kernelExtends; y <= kernelExtends; ++y)
+		{
+			int sampleY = FMath::Clamp(y, 0, kernelExtends);
+			weightsVertical.Get(x, 0) += weightsHorizontal.Get(x, sampleY);
+		}
+
+		for (int y = 1; y < GridSizeY; ++y)
+		{
+			int removeIndex = FMath::Clamp(y - kernelExtends - 1, 0, GridSizeY);
+			int addIndex = FMath::Clamp(y + kernelExtends, 0, GridSizeY - 1);
+			weightsVertical.Get(x, y) = weightsVertical.Get(x, y-1) - weightsHorizontal.Get(x, removeIndex) + weightsHorizontal.Get(x, addIndex);
+
+			int blurredWeight = FMath::RoundToInt((float)weightsVertical.Get(x, y) / (kernelSize * kernelSize));
+			Grid.Get(x, y)->Weight = blurredWeight;
+
+			if(MaxWeight < blurredWeight)
+			{
+				MaxWeight = blurredWeight;
+			}
+			if(MinWeight > blurredWeight)
+			{
+				MinWeight = blurredWeight;
+			}
+		}
+	}
+
 }
 
 void APathGrid::DrawGrid()
 {
-
-	DrawDebugBox(GetWorld(), GetActorLocation(), FVector(GridWorldSize/2, 10), FColor::Green, false, 100);
 	FVector bounds = FVector(NodeRadius, NodeRadius, 0);
 	
 	for(int i = 0; i < Grid.Num(); ++i)
 	{
 		UPathNode* node = Grid.Get(i);
-		FColor color;
+		FColor color = FColor::Red;
 		if (node->IsWalkable)
 		{
-			color = node->Weight > 0 ? FColor::White : FColor::Yellow;
+			float c = 255 * FMath::Lerp(1.0f, 0.0f, UKismetMathLibrary::NormalizeToRange(node->Weight, MinWeight, MaxWeight));
+			color = FColor(c,c,c);
 		}
-		else
+		if(ShowDebugGrid)
 		{
-			color = FColor::Red;
+			UKismetSystemLibrary::DrawDebugPlane(GetWorld(), FPlane(0, 0, 1, 50), node->WorldPosition, NodeRadius, color, 100);
 		}
-
-		int priority = node->IsWalkable ? 0 : -1;
-		DrawDebugBox(GetWorld(), node->WorldPosition, bounds, color, false, 100, priority);
 	}
 }
